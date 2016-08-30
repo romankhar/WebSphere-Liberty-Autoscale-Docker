@@ -63,7 +63,7 @@ start_controller
 my_pause
 
 echo_my "Register all other hosts for future auto-scaling..." 
-./register_hosts.sh 
+register_hosts
 my_pause
 
 # enable dynamic routing between HTTP server and the Liberty collective
