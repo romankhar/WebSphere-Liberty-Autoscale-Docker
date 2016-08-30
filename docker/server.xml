@@ -1,0 +1,22 @@
+<server description="Default Server">
+   <featureManager>
+		<feature>jsp-2.3</feature>
+		<feature>localConnector-1.0</feature>
+   </featureManager>
+
+	<httpEndpoint host="*" id="defaultHttpEndpoint"
+	                 httpPort="${memberHttpPort}"
+	                 httpsPort="${memberHttpsPort}" />
+
+	<remoteFileAccess>
+		<writeDir>${server.config.dir}</writeDir>
+	</remoteFileAccess>
+
+	<applicationMonitor dropinsEnabled="true"
+		pollingRate="500ms" updateTrigger="polled" />
+
+	<remoteFileAccess>
+		<writeDir>${server.config.dir}</writeDir>
+	</remoteFileAccess>
+
+</server>

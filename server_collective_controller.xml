@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<server description="Liberty Collective Controller configuration">
+	<featureManager>
+		<feature>jsp-2.3</feature>
+		<feature>localConnector-1.0</feature>
+		<feature>clusterMember-1.0</feature>
+		<feature>dynamicRouting-1.0</feature>
+		<feature>scalingController-1.0</feature>
+		<feature>adminCenter-1.0</feature>
+	</featureManager>
+
+	<include location="collective-create-include.xml" />
+
+	<httpEndpoint host="*" httpPort="${env.CONTROLLER_HTTP_PORT}" httpsPort="${env.CONTROLLER_PORT}" id="defaultHttpEndpoint" />
+	<httpEndpoint host="*" httpsPort="${env.DYNAMIC_ROUTING_PORT}" id="dynamicRoutingEndpoint" />
+
+	<remoteFileAccess>
+		<writeDir>${server.config.dir}</writeDir>
+	</remoteFileAccess>
+
+	<basicRegistry id="basic" realm="ibm/api">
+		<user name="${env.ADMIN_USER}" password="${env.ADMIN_PASSWORD}" />
+	</basicRegistry>
+
+	<administrator-role>
+		<user>${env.ADMIN_USER}</user>
+	</administrator-role>
+
+	<!-- Enable the hostAccess capability -->
+	<!-- <hostAccess enableRXATrace="true" />
+	<logging traceSpecification="*=info:Scaling=all:com.ibm.ws.imf.*=all:com.ibm.ws.collective.singleton.*=all" traceFileName="trace.log" 
+		maxFileSize="20" maxFiles="10" traceFormat="BASIC" /> -->
+
+	<!-- Enable trace - more details here http://www-01.ibm.com/support/docview.wss?uid=swg21596714 -->
+	<!-- <logging traceSpecification="*=info:Scaling=all:com.ibm.ws.imf.*=all:com.ibm.ws.collective.singleton.*=all:com.ibm.ws.ui.tool.*=all" traceFileName="trace.log" 
+		maxFileSize="20" maxFiles="10" traceFormat="BASIC" /> -->
+
+	<scalingDefinitions>
+		<defaultScalingPolicy enabled="true" min="3" max="30" />
+		<scalingPolicy id="myScalingPolicy" enabled="true" min="1" max="15"> 
+			<bind clusters="${env.CLUSTER_PREFIX}" /> 
+<!--			<bind clusters="${env.CLUSTER_PREFIX}*" />   at this time the wildcarded cluster name is not supported for container auto-scale auto-start -->
+			<metric name="cpu" min="30" max="80" /> 
+			<in amount="1" units="instance" minInterval="60s" /> 
+			<out amount="1" units="instance" minInterval="60s" /> 
+		</scalingPolicy>
+	</scalingDefinitions>
+
+	<!-- Docker specific stuff -->
+	<collectiveController user="${env.ADMIN_USER}" password="${env.ADMIN_PASSWORD}" />
+	
+	<deployVariable name="memberHttpPort" value="${env.HTTP_PORT_BASE}" increment="1" />
+	<deployVariable name="memberHttpsPort" value="${env.HTTPS_PORT_BASE}" increment="1" />
+</server>

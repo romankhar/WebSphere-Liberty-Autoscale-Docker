@@ -1,0 +1,93 @@
+#!/bin/bash
+
+# Script to remove a Liberty Docker container from a collective controller.
+#
+# Required: <containerName> - positional parameter that is the
+#                             name of this Docker container
+#           --host - collective controller hostname
+#           --port - collective controller https port
+#           --user - collective controller admin user
+#           --password - collective controller admin user password
+#           --dockerHost - hostname of the Docker host this container resides on
+#
+#
+
+# Set initial values
+
+containerName=$1
+
+# Parse the command line
+
+failure="false"
+
+if [[ -z $1 ]]; then
+    # No values received
+    echo "Error: no parameters specified"
+    failure="true"
+else
+    TEMP=`getopt --long host:,port:,user:,password:,dockerHost:: -- "$@"`
+    eval set -- "$TEMP"
+    OPTIND=-1
+
+    while true ; do
+        case "$1" in
+           --host) controllerHost=$2; shift 2;;
+           --port) controllerPort=$2; shift 2;;
+           --user) controllerUser=$2; shift 2;;
+           --password) controllerPassword=$2; shift 2;;
+           --dockerHost) dockerHost=$2; shift 2;;
+           *) break;;
+        esac
+    done
+
+    # Validate the required parameters 
+    if [[ -z "$containerName" ]]; then
+        echo "Error: no containerName specified, validation suspended"
+        failure="true"
+    fi
+
+    # if a containerName is not specified, bash uses the
+    # 1st "--" parameter as the containerName
+
+    if [[ $containerName == --* ]]; then
+        echo "Error: no containerName specified, validation suspended"
+        failure="true"
+    fi
+
+    # When the positional parameter containerName fails, 
+    # suspend validation reporting
+
+    if [[ $failure == false ]]; then
+        if [[ -z "${controllerHost// }" ]]; then
+            echo "Error: no host specified"
+            failure="true"
+        fi
+        if [[ -z "${controllerPort// }" ]]; then
+            echo "Error: no port specified"
+            failure="true"
+        fi
+        if [[ -z "${controllerUser// }" ]]; then
+            echo "Error: no user specified"
+            failure="true"
+        fi
+        if [[ -z "${controllerPassword// }" ]]; then
+            echo "Error: no password specified"
+            failure="true"
+        fi
+        if [[ -z "${dockerHost// }" ]]; then
+            echo "Error: no dockerHost specified"
+            failure="true"
+        fi
+    fi
+fi
+
+    # Invoke the collective utility
+if [[ $failure == false ]]; then
+
+    /opt/ibm/wlp/bin/collective remove defaultServer --host=$controllerHost --port=$controllerPort --user=$controllerUser --password=$controllerPassword  --hostName=$dockerHost --autoAcceptCertificates
+
+else
+    # At least one required parameter was missing, 
+    # notify the user of the correct syntax
+    printf "Usage:  removeMember <containerName> \n\t--host=<controller host> \n\t--port=<controller https port> \n\t--user=<controller user> \n\t--password=<controller password> \n\t--dockerHost=<docker host> \n"
+fi

@@ -1,0 +1,5 @@
+*.old.*
+plugin-key.jks
+plugin-cfg.xml
+log_show_http.sh
+log_clean_http.sh

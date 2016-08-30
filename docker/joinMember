@@ -1,0 +1,124 @@
+#!/bin/bash
+
+# Script to join a Liberty Docker container to a collective controller.
+#
+# Required: <containerName> - positional parameter that is the name 
+#                             of this Docker container
+#           --host - collective controller hostname
+#           --port - collective controller https port
+#           --user - collective controller admin user
+#           --password - collective controller admin user password
+#           --keystorePassword - to be used for the member keystore
+#           --dockerHost - hostname of the Docker host this container resides on
+#
+# Optional: --clusterName - cluster name for the member configuration.  
+#                           If specified, it adds the cluster and scaling member features also.
+
+# Set initial values
+containerName=$1
+
+# Parse the command line
+failure="false"
+
+if [[ -z $1 ]]; then
+    # No values received
+    echo "Error: no parameters specified"
+    failure="true"
+else
+    TEMP=`getopt --long host:,port:,user:,password:,keystorePassword:,dockerHost:,clusterName:: -- "$@"`
+    eval set -- "$TEMP"
+    OPTIND=-1
+    
+    while true ; do
+        case "$1" in
+           --host) controllerHost=$2; shift 2;;
+           --port) controllerPort=$2; shift 2;;
+           --user) controllerUser=$2; shift 2;;
+           --password) controllerPassword=$2; shift 2;;
+           --keystorePassword) memberKeystorePassword=$2; shift 2;;
+           --dockerHost) dockerHost=$2; shift 2;;
+           --clusterName) clusterName=$2; shift 2;;
+           *) break;;
+        esac
+    done
+
+    # Validate the required parameters
+    if [[ -z "$containerName" ]]; then
+        echo "Error: no containerName specified, validation suspended"
+        failure="true"
+    fi
+
+    # if a containerName is not specified, bash uses the 
+    # 1st "--" parameter as the containerName
+    if [[ $containerName == --* ]]; then
+        echo "Error: no containerName specified, validation suspended"
+        failure="true"
+    fi
+    
+    # When the positional parameter containerName fails, 
+    # suspend validation reporting
+    if [[ $failure == false ]]; then
+        if [[ -z "${controllerHost// }" ]]; then
+            echo "Error: no host specified"
+            failure="true"
+        fi
+        if [[ -z "${controllerPort// }" ]]; then
+            echo "Error: no port specified"
+            failure="true"
+        fi
+        if [[ -z "${controllerUser// }" ]]; then
+            echo "Error: no user specified"
+            failure="true"
+        fi
+        if [[ -z "${controllerPassword// }" ]]; then
+            echo "Error: no password specified"
+            failure="true"
+        fi
+        if [[ -z "${memberKeystorePassword// }" ]]; then
+            echo "Error: no keystorePassword specified"
+            failure="true"
+        fi
+        if [[ -z "${dockerHost// }" ]]; then
+            echo "Error: no dockerHost specified"
+            failure="true"
+        fi
+    fi
+fi
+
+if [[ $failure == false ]]; then
+    # Create the env.properties file for the Liberty Docker member
+    echo containerName=$containerName > /opt/ibm/docker/env.properties
+    echo containerHost=$dockerHost >> /opt/ibm/docker/env.properties
+
+    # Invoke the collective utility
+    /opt/ibm/wlp/bin/collective join defaultServer --host=$controllerHost --port=$controllerPort --user=$controllerUser --password=$controllerPassword --hostName=$dockerHost --createConfigFile --keystorePassword=$memberKeystorePassword --autoAcceptCertificates --genDeployVariables
+
+    # Build additional config dropin snippets
+    if [[ $clusterName = *[!\ ]* ]]; then
+        echo \<?xml version=\"1.0\" encoding=\"UTF-8\" ?\> > /opt/ibm/wlp/usr/servers/defaultServer/cfgfeatures.xml
+        echo \<server\> >> /opt/ibm/wlp/usr/servers/defaultServer/cfgfeatures.xml
+        echo $'\t'\<featureManager\> >> /opt/ibm/wlp/usr/servers/defaultServer/cfgfeatures.xml
+        echo $'\t'$'\t'\<feature\>clusterMember-1.0\</feature\> >>  /opt/ibm/wlp/usr/servers/defaultServer/cfgfeatures.xml
+        echo $'\t'$'\t'\<feature\>scalingMember-1.0\</feature\> >>  /opt/ibm/wlp/usr/servers/defaultServer/cfgfeatures.xml
+        echo $'\t'\</featureManager\> >> /opt/ibm/wlp/usr/servers/defaultServer/cfgfeatures.xml
+        echo \</server\> >> /opt/ibm/wlp/usr/servers/defaultServer/cfgfeatures.xml
+        echo \<?xml version=\"1.0\" encoding=\"UTF-8\" ?\> > /opt/ibm/wlp/usr/servers/defaultServer/cluster-config.xml
+        echo \<server\> >> /opt/ibm/wlp/usr/servers/defaultServer/cluster-config.xml
+        echo $'\t'\<clusterMember name=\"$clusterName\" /\> >> /opt/ibm/wlp/usr/servers/defaultServer/cluster-config.xml
+        echo \</server\> >> /opt/ibm/wlp/usr/servers/defaultServer/cluster-config.xml
+    else
+        echo "No clusterName provided, the container will not be configured as a cluster or scaling member."
+    fi
+
+    # Move config snippets to the proper location for consumption
+    mkdir -p /opt/ibm/wlp/usr/servers/defaultServer/configDropins/overrides
+    mv /opt/ibm/wlp/usr/servers/defaultServer/c*.xml /opt/ibm/wlp/usr/servers/defaultServer/configDropins/overrides
+    if [ -f /opt/ibm/wlp/usr/servers/defaultServer/user-collective-include.xml ]
+    then
+        cp /opt/ibm/wlp/usr/servers/defaultServer/user-collective-include.xml /opt/ibm/wlp/usr/servers/defaultServer/configDropins/overrides
+    fi
+else
+    # At least one required parameter was missing, 
+    # notify the user of the correct syntax
+    printf "Usage:  joinMember <containerName> \n\t--host <controller host> \n\t--port <controller https port> \n\t--user <controller user> \n\t--password <controller password> \n\t--keystorePassword <member keystore password> \n\t--dockerHost <hostname of the Docker host> \n\t[--clusterName <cluster name for the member>]\n"
+fi
